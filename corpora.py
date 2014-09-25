@@ -17,7 +17,7 @@ import re
 
 # Deps
 import html2text
-from workflow import Workflow, web
+from workflow import Workflow, web, MATCH_ALL, MATCH_ALLCHARS
 from bs4 import BeautifulSoup, SoupStrainer, NavigableString
 
 CORPORA = {
@@ -28,9 +28,10 @@ CORPORA = {
 
 class Corpus(object):
 
-    def __init__(self, wf, corpus):
+    def __init__(self, wf, corpus, query):
         self.wf = wf
         self.corpus = corpus
+        self.query = query
         self.index = self.index_json()
 
     @property
@@ -82,6 +83,37 @@ class Corpus(object):
             self.wf.store_data(index_file, index_json, serializer='json')
         return index_json
 
+    def search_index(self):
+        index_data = self.index_json()
+        match_keys = self.wf.filter(self.query, index_data.keys(),
+                                match_on=MATCH_ALL ^ MATCH_ALLCHARS)
+        for key in match_keys:
+            data = index_data[key]
+            print data
+        
+
+    """
+    def _phi_author_search_string(self, key, val):
+        print key
+        author_string = list()
+        author_string.append(key)
+        try:
+            author_string.append(val['phi_author_num'])
+        except:
+            print key
+        for work in val['phi_author_works']:
+            work_string = list()
+            work_string.append(work['phi_work_name'])
+            work_string.append(work['phi_work_bib'])
+            search_string = work_string + author_string
+            return ' '.join(search_string)
+        return ' '.join(author_string)
+    """
+
+
+
+    ## Individual corpus index generators -------------------------------------
+
     def phi_index_json(self, index_html):
         strainer = SoupStrainer('div', {"class" : "canon"})
         soup = BeautifulSoup(index_html, parse_only=strainer)
@@ -89,8 +121,7 @@ class Corpus(object):
         info = OrderedDict()
         for item in items:
             author = self._string(item.a.find('span', {'class': 'anam'}))
-            d = info[author] = dict()
-
+            d = dict()
             d['phi_author_url'] = self._strip(item.a.get('href'))
             d['phi_author_name'] = self._string(item.a.find('span', {'class': 'anam'}))
             d['phi_author_num'] = self._string(item.a.find('span', {'class': 'anum'}))
@@ -105,7 +136,7 @@ class Corpus(object):
                 wd['phi_work_num'] = self._string(work.a.find('span', {'class': 'wnum'}))
                 wd['phi_work_abrv'] = self._string(work.a.find('span', {'class': 'wabv'}))
                 d['phi_author_works'].append(wd)
-            info.update(d)
+            info[author] = d
         return info
 
     def loeb_index_json(self, index_html):
@@ -184,6 +215,7 @@ class Corpus(object):
             info[author] = d
         return info
 
+    ### Corpus index generator helper scripts ---------------------------------
 
     @staticmethod
     def _perseus_cleanup_link(link):
@@ -236,7 +268,6 @@ class Corpus(object):
                     array.append(d)
         return array
 
-
     ## ------------------------------------------------------------------------
 
     @staticmethod
@@ -256,13 +287,13 @@ class Corpus(object):
 
 
 def main(wf):
-    loeb_authors = Corpus(wf, 'loeb').index.keys()
-    phi_authors = Corpus(wf, 'phi').index.keys()
-    perseus_authors = Corpus(wf, 'perseus').index.keys()
+    #loeb_authors = Corpus(wf, 'loeb').index.keys()
+    phi_authors = Corpus(wf, 'perseus', 'gellius').search_index()
+    #perseus_authors = Corpus(wf, 'perseus').index.keys()
 
-    all_authors = [loeb_authors, phi_authors, perseus_authors]
-    print len(loeb_authors), len(phi_authors), len(perseus_authors)
-    print set(all_authors[0]).intersection(*all_authors)
+    #all_authors = [loeb_authors, phi_authors, perseus_authors]
+    #print len(loeb_authors), len(phi_authors), len(perseus_authors)
+    #print set(all_authors[0]).intersection(*all_authors)
 
 
 if __name__ == '__main__':
